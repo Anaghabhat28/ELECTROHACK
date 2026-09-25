@@ -15,6 +15,8 @@ It provides the detected tower class, confidence score, bounding box, and an ann
 
 ## 🎯 Problem Statement
 
+AI-Based Tower Component Detection and Visualization
+
 Tower inspection often relies on manually reviewing images captured from different environments. Poor-quality images such as blurry, underexposed, or overexposed images can result in unreliable detection.
 
 TowerVision AI addresses this by introducing an automated pipeline:
