@@ -6,3 +6,8 @@ runs/
 *.jpg
 *.jpeg
 *.png
+.env
+*.env
+.vscode/
+.idea/
+.pytest_cache/
