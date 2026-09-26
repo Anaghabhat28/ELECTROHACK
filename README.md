@@ -674,7 +674,7 @@ These features can be incorporated as the project progresses.
 
 ---
 
-# 👥 Team
+# 👥 Team - INNOVEXA
 
 Developed as part of **ELECTROHACK 4.0**.
 
