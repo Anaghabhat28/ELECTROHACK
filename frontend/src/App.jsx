@@ -1,250 +1,177 @@
 import { useState } from "react";
 import "./App.css";
 
+const API_URL = "/api/detect";
+const API_BASE = "http://127.0.0.1:8001";
+
 function App() {
-  const [selectedImage, setSelectedImage] = useState(null);
-  const [imageName, setImageName] = useState("");
-  const [quality, setQuality] = useState(null);
-  const [qualityStatus, setQualityStatus] = useState(null);
-  const [towerType, setTowerType] = useState(null);
-  const [confidence, setConfidence] = useState(null);
-  const [progress, setProgress] = useState(0);
-  const [status, setStatus] = useState("Waiting for image");
-  const [processing, setProcessing] = useState(false);
-  const [completed, setCompleted] = useState(false);
-  const [rejected, setRejected] = useState(false);
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState("");
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  // =========================
-  // IMAGE UPLOAD
-  // =========================
-  const handleImageUpload = (event) => {
-    const file = event.target.files[0];
+  const handleUpload = (e) => {
+    const selectedFile = e.target.files?.[0];
 
-    if (!file) return;
+    if (!selectedFile) return;
 
-    const imageURL = URL.createObjectURL(file);
-
-    setImageName(file.name);
-    setSelectedImage(imageURL);
-
-    setQuality(null);
-    setQualityStatus(null);
-    setTowerType(null);
-    setConfidence(null);
-    setProgress(0);
-    setCompleted(false);
-    setRejected(false);
-    setProcessing(false);
-    setStatus("Image uploaded successfully");
+    setFile(selectedFile);
+    setPreview(URL.createObjectURL(selectedFile));
+    setResult(null);
   };
 
-  // =========================
-  // AI ANALYSIS
-  // =========================
-  const analyzeImage = () => {
-    if (!selectedImage) {
-      alert("Please upload a tower image first.");
+  const analyzeImage = async () => {
+    if (!file) {
+      alert("Please upload an image first.");
       return;
     }
 
-    setProcessing(true);
-    setCompleted(false);
-    setRejected(false);
-    setTowerType(null);
-    setConfidence(null);
+    setLoading(true);
+    setResult(null);
 
-    setProgress(10);
-    setStatus("Checking image quality...");
+    const formData = new FormData();
+    formData.append("file", file);
 
-    // STEP 1 - IMAGE QUALITY
-    setTimeout(() => {
-      const fileName = imageName.toLowerCase();
+    try {
+      const response = await fetch(API_URL, {
+        method: "POST",
+        body: formData,
+      });
 
-      /*
-        DEMO QUALITY TESTING
+      if (!response.ok) {
+        let message = `Backend returned HTTP ${response.status}`;
 
-        If filename contains:
-        blur / blurred       -> image rejected
-        overexposed / over   -> image rejected
-        underexposed / under -> image rejected
+        try {
+          const errorData = await response.json();
+          message = errorData.detail || message;
+        } catch {
+          // Ignore JSON parsing error
+        }
 
-        Otherwise image is accepted.
-      */
-
-      const badImage =
-        fileName.includes("blur") ||
-        fileName.includes("overexposed") ||
-        fileName.includes("over") ||
-        fileName.includes("underexposed") ||
-        fileName.includes("under");
-
-      if (badImage) {
-        setQuality(35);
-        setQualityStatus("Rejected");
-        setProgress(35);
-        setRejected(true);
-        setProcessing(false);
-        setStatus("Image rejected - unsuitable for detection");
-        return;
+        throw new Error(message);
       }
 
-      setQuality(92);
-      setQualityStatus("Accepted");
-      setProgress(30);
-      setStatus("Image quality check completed");
-    }, 1200);
+      const data = await response.json();
 
-    // STEP 2 - OBJECT DETECTION
-    setTimeout(() => {
-      if (rejected) return;
+      console.log("Backend response:", data);
 
-      setProgress(55);
-      setStatus("Detecting tower structure...");
-    }, 2200);
+      setResult(data);
+   } catch (error) {
+  console.error("Frontend error:", error);
 
-    // STEP 3 - TOWER DETECTION
-    setTimeout(() => {
-      const fileName = imageName.toLowerCase();
-
-      let result = "Unknown Tower";
-      let score = 88;
-
-      /*
-        TEMPORARY DEMO DETECTION
-
-        supporting.jpg -> Supporting Tower
-        monopole.jpg   -> Monopole Tower
-
-        Later this section will be replaced
-        with your trained AI model.
-      */
-
-      if (
-        fileName.includes("supporting") ||
-        fileName.includes("support")
-      ) {
-        result = "Supporting Tower";
-        score = 94;
-      } else if (
-        fileName.includes("monopole") ||
-        fileName.includes("mono")
-      ) {
-        result = "Monopole Tower";
-        score = 96;
-      }
-
-      setTowerType(result);
-      setConfidence(score);
-      setProgress(80);
-      setStatus("Tower structure detected");
-    }, 3500);
-
-    // STEP 4 - COMPLETION
-    setTimeout(() => {
-      setProgress(100);
-      setStatus("Analysis completed successfully");
-      setProcessing(false);
-      setCompleted(true);
-    }, 4700);
+  setResult({
+    accepted: false,
+    reason: `Backend connection failed: ${error.message}`,
+    quality: {
+      accepted: false,
+      reason: "Backend request failed",
+      blur_score: 0,
+      brightness: 0,
+    },
+    detections: [],
+    average_confidence: {
+      supporting_tower: 0,
+      monopole_tower: 0,
+    },
+    image: null,
+    connectionError: true,
+  });
+} finally {      setLoading(false);
+    }
   };
 
-  // =========================
-  // RESET
-  // =========================
-  const resetDashboard = () => {
-    setSelectedImage(null);
-    setImageName("");
-    setQuality(null);
-    setQualityStatus(null);
-    setTowerType(null);
-    setConfidence(null);
-    setProgress(0);
-    setStatus("Waiting for image");
-    setProcessing(false);
-    setCompleted(false);
-    setRejected(false);
+  const reset = () => {
+    setFile(null);
+    setPreview("");
+    setResult(null);
+  };
+
+  const getDetectionCount = () => {
+    return result?.detections?.length || 0;
+  };
+
+  const getClassConfidence = (className) => {
+    const value = result?.average_confidence?.[className];
+
+    if (typeof value !== "number" || value <= 0) {
+      return "0%";
+    }
+
+    return `${(value * 100).toFixed(2)}%`;
+  };
+
+  const getTowerTypes = () => {
+    if (!result?.detections?.length) {
+      return "No tower detected";
+    }
+
+    return [
+      ...new Set(result.detections.map((d) => d.class)),
+    ].join(", ");
   };
 
   return (
     <div className="app">
-
-      {/* BACKGROUND */}
-      <div className="glow glow-one"></div>
-      <div className="glow glow-two"></div>
-      <div className="grid-background"></div>
-
-      {/* HEADER */}
       <header className="header">
-
         <div className="brand">
-
-          <div className="brand-icon">◈</div>
+          <div className="brand-icon">⚡</div>
 
           <div>
             <h1>TowerVision AI</h1>
             <p>Intelligent Tower Detection & Inspection</p>
           </div>
-
         </div>
 
         <div className="system-status">
           <span className="status-dot"></span>
           AI SYSTEM ONLINE
         </div>
-
       </header>
 
-      {/* DASHBOARD */}
       <main className="dashboard">
 
-        {/* WELCOME */}
         <section className="welcome">
-
           <div>
-
             <p className="small-title">
               AI-POWERED INFRASTRUCTURE INSPECTION
             </p>
 
             <h2>
-              Detect Your Tower
-              <span> Instantly.</span>
+              Detect Your Tower <span>Instantly.</span>
             </h2>
 
             <p className="description">
-              Upload a tower image and let our intelligent vision
-              system check image quality, detect the tower structure,
-              and generate a detailed inspection result.
+              Upload a tower image. Our AI first checks image quality,
+              then performs real YOLO-based tower detection.
             </p>
-
           </div>
 
           <div className="ai-orb">
             <div className="orb-ring"></div>
             <div className="orb-core">AI</div>
           </div>
-
         </section>
 
-        {/* STAT CARDS */}
         <section className="stats">
 
           <div className="stat-card">
             <div className="stat-icon">📷</div>
             <div>
               <span>INPUT</span>
-              <strong>
-                {selectedImage ? "Received" : "Waiting"}
-              </strong>
+              <strong>{file ? "Received" : "Waiting"}</strong>
             </div>
           </div>
 
           <div className="stat-card">
-            <div className="stat-icon">✨</div>
+            <div className="stat-icon">✓</div>
             <div>
               <span>IMAGE QUALITY</span>
               <strong>
-                {quality ? `${quality}%` : "--"}
+                {result?.quality
+                  ? result.quality.accepted
+                    ? "Accepted"
+                    : "Rejected"
+                  : "--"}
               </strong>
             </div>
           </div>
@@ -254,7 +181,9 @@ function App() {
             <div>
               <span>TOWER TYPE</span>
               <strong>
-                {towerType || "--"}
+                {result?.detections?.length
+                  ? result.detections.map((d) => d.class).join(", ")
+                  : "--"}
               </strong>
             </div>
           </div>
@@ -264,12 +193,12 @@ function App() {
             <div>
               <span>STATUS</span>
               <strong>
-                {rejected
-                  ? "Rejected"
-                  : completed
-                  ? "Completed"
-                  : processing
+                {loading
                   ? "Processing"
+                  : result
+                  ? result.accepted
+                    ? "Completed"
+                    : "Rejected"
                   : "Ready"}
               </strong>
             </div>
@@ -277,80 +206,54 @@ function App() {
 
         </section>
 
-        {/* MAIN TWO COLUMN AREA */}
         <section className="main-grid">
 
-          {/* =========================
-              LEFT - IMAGE INPUT
-          ========================= */}
           <div className="panel upload-panel">
 
             <div className="panel-heading">
-
               <div>
-                <p className="panel-label">
-                  IMAGE INPUT
-                </p>
-
-                <h3>
-                  Tower Image
-                </h3>
+                <p className="panel-label">IMAGE INPUT</p>
+                <h3>Tower Image</h3>
               </div>
 
-              <span className="step-number">
-                01
-              </span>
-
+              <span className="step-number">01</span>
             </div>
 
-            {/* NO IMAGE */}
-            {!selectedImage ? (
-
+            {!preview ? (
               <label className="upload-box">
 
                 <input
                   type="file"
                   accept="image/*"
-                  onChange={handleImageUpload}
+                  onChange={handleUpload}
                 />
 
-                <div className="upload-icon">
-                  ↑
-                </div>
+                <div className="upload-icon">⬆</div>
 
-                <h4>
-                  Upload Tower Image
-                </h4>
+                <h4>Upload Tower Image</h4>
 
-                <p>
-                  Click here to browse your computer
-                </p>
+                <p>Click here to browse your computer</p>
 
                 <span className="supported">
-                  JPG • JPEG • PNG
+                  JPG • JPEG • PNG • WEBP
                 </span>
 
               </label>
-
             ) : (
-
               <div className="preview-container">
 
                 <img
-                  src={selectedImage}
+                  src={preview}
                   alt="Uploaded tower"
                   className="tower-image"
                 />
 
                 <div className="image-info">
 
-                  <span>📁</span>
+                  <span>📄</span>
 
                   <div>
-                    <strong>
-                      {imageName}
-                    </strong>
-
+                    <strong>{file?.name}</strong>
                     <small>
                       Image ready for AI inspection
                     </small>
@@ -359,99 +262,67 @@ function App() {
                 </div>
 
               </div>
-
             )}
 
-            {/* BUTTONS */}
-            {selectedImage && (
-
+            {file && (
               <div className="button-group">
 
                 <button
                   className="analyze-button"
                   onClick={analyzeImage}
-                  disabled={processing}
+                  disabled={loading}
                 >
-                  {processing
+                  {loading
                     ? "AI ANALYZING..."
-                    : "▶ ANALYZE TOWER"}
+                    : "⚡ ANALYZE TOWER"}
                 </button>
 
-                <label className="new-image-button">
-
+                <button
+                  className="new-image-button"
+                  onClick={reset}
+                  disabled={loading}
+                >
                   ↻ Upload New Image
-
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                  />
-
-                </label>
+                </button>
 
               </div>
-
             )}
 
           </div>
 
-          {/* =========================
-              RIGHT - AI PIPELINE
-          ========================= */}
           <div className="panel process-panel">
 
             <div className="panel-heading">
 
               <div>
-
-                <p className="panel-label">
-                  AI PIPELINE
-                </p>
-
-                <h3>
-                  Detection Process
-                </h3>
-
+                <p className="panel-label">AI PIPELINE</p>
+                <h3>Detection Process</h3>
               </div>
 
-              <span className="live-badge">
-                LIVE
-              </span>
+              <span className="live-badge">LIVE</span>
 
             </div>
 
             <div className="pipeline">
 
-              {/* QUALITY */}
               <div className="pipeline-item">
 
-                <div
-                  className={`pipeline-icon ${
-                    quality
-                      ? rejected
-                        ? "rejected-icon"
-                        : "completed-icon"
-                      : ""
-                  }`}
-                >
-                  {quality
-                    ? rejected
-                      ? "!"
-                      : "✓"
-                    : "01"}
+                <div className="pipeline-icon completed-icon">
+                  01
                 </div>
 
                 <div className="pipeline-content">
 
-                  <strong>
-                    Image Quality Check
-                  </strong>
+                  <strong>Image Quality Check</strong>
 
                   <span>
-                    {quality
-                      ? rejected
-                        ? "Image quality insufficient"
-                        : `Quality Score: ${quality}%`
+                    {loading
+                      ? "Checking image quality..."
+                      : result?.quality
+                      ? result.quality.accepted
+                        ? "Image quality accepted"
+                        : result.quality.reason ||
+                          result.reason
                       : "Waiting for analysis"}
                   </span>
 
@@ -459,27 +330,20 @@ function App() {
 
               </div>
 
-              {/* OBJECT DETECTION */}
               <div className="pipeline-item">
 
-                <div
-                  className={`pipeline-icon ${
-                    towerType ? "completed-icon" : ""
-                  }`}
-                >
-                  {towerType ? "✓" : "02"}
-                </div>
+                <div className="pipeline-icon">02</div>
 
                 <div className="pipeline-content">
 
-                  <strong>
-                    Object Detection
-                  </strong>
+                  <strong>Object Detection</strong>
 
                   <span>
-                    {towerType
-                      ? "Tower structure detected"
-                      : rejected
+                    {loading
+                      ? "YOLO model processing..."
+                      : result?.accepted
+                      ? `${getDetectionCount()} detection(s) found`
+                      : result
                       ? "Detection skipped"
                       : "AI model waiting"}
                   </span>
@@ -488,28 +352,21 @@ function App() {
 
               </div>
 
-              {/* COMPLETION */}
               <div className="pipeline-item">
 
-                <div
-                  className={`pipeline-icon ${
-                    completed ? "completed-icon" : ""
-                  }`}
-                >
-                  {completed ? "✓" : "03"}
-                </div>
+                <div className="pipeline-icon">03</div>
 
                 <div className="pipeline-content">
 
-                  <strong>
-                    Analysis Completion
-                  </strong>
+                  <strong>Analysis Completion</strong>
 
                   <span>
-                    {completed
-                      ? "Detection successfully completed"
-                      : rejected
-                      ? "Detection process terminated"
+                    {loading
+                      ? "Processing..."
+                      : result
+                      ? result.accepted
+                        ? "Detection successfully completed"
+                        : "Image rejected"
                       : "Processing pending"}
                   </span>
 
@@ -519,67 +376,32 @@ function App() {
 
             </div>
 
-            {/* PROGRESS */}
-            <div className="progress-section">
+            {loading && (
+              <div className="progress-section">
 
-              <div className="progress-top">
+                <div className="progress-top">
+                  <span>Processing</span>
+                  <strong>AI</strong>
+                </div>
 
-                <span>
-                  Processing Progress
-                </span>
-
-                <strong>
-                  {progress}%
-                </strong>
-
-              </div>
-
-              <div className="progress-bar">
-
-                <div
-                  className="progress-fill"
-                  style={{
-                    width: `${progress}%`
-                  }}
-                ></div>
+                <div className="progress-bar">
+                  <div
+                    className="progress-fill"
+                    style={{ width: "70%" }}
+                  ></div>
+                </div>
 
               </div>
-
-            </div>
-
-            {/* CURRENT STATUS */}
-            <div className="current-status">
-
-              <span className="status-small-dot"></span>
-
-              <div>
-
-                <small>
-                  CURRENT STATUS
-                </small>
-
-                <strong>
-                  {status}
-                </strong>
-
-              </div>
-
-            </div>
+            )}
 
           </div>
 
         </section>
 
-        {/* =========================
-            IMAGE QUALITY REJECTION
-        ========================= */}
-        {rejected && (
-
+        {result && !result.accepted && (
           <section className="rejection-panel">
 
-            <div className="rejection-icon">
-              ⚠
-            </div>
+            <div className="rejection-icon">⚠</div>
 
             <div className="rejection-content">
 
@@ -587,114 +409,78 @@ function App() {
                 IMAGE QUALITY VALIDATION
               </p>
 
-              <h3>
-                Image Rejected
-              </h3>
+              <h3>Image Rejected</h3>
 
-              <p>
-                Image quality is insufficient for reliable detection.
-              </p>
+              <p>{result.reason}</p>
 
               <span>
-                Detection process terminated.
+                Object detection was skipped to avoid unreliable results.
               </span>
+
+              {result.quality && (
+                <p>
+                  Blur Score:{" "}
+                  {result.quality.blur_score ?? "N/A"}
+                  {" | "}
+                  Brightness:{" "}
+                  {result.quality.brightness ?? "N/A"}
+                </p>
+              )}
 
             </div>
 
           </section>
-
         )}
 
-        {/* =========================
-            RESULT
-        ========================= */}
-        {towerType && !rejected && (
-
+        {result?.accepted && (
           <section className="result-panel">
 
             <div className="result-header">
 
               <div>
-
-                <p className="panel-label">
-                  AI RESULT
-                </p>
-
-                <h3>
-                  Detection Output
-                </h3>
-
+                <p className="panel-label">AI RESULT</p>
+                <h3>Detection Output</h3>
               </div>
 
-              {completed && (
-
-                <div className="success-notification">
-
-                  <span>✓</span>
-
-                  Analysis Completed Successfully
-
-                </div>
-
-              )}
+              <div className="success-notification">
+                ✓ Analysis Completed Successfully
+              </div>
 
             </div>
 
             <div className="result-grid">
 
-              {/* OUTPUT IMAGE */}
               <div className="output-image-container">
 
-                {selectedImage && (
+                <div className="detection-wrapper">
 
-                  <div className="detection-wrapper">
+                  <img
+                    src={
+                      result.image
+                        ? `${API_BASE}${result.image}`
+                        : preview
+                    }
+                    alt="Detection output"
+                  />
 
-                    <img
-                      src={selectedImage}
-                      alt="Detection output"
-                    />
-
-                    <div className="detection-box">
-
-                      <span>
-                        {towerType}
-                      </span>
-
-                      <div className="corner tl"></div>
-                      <div className="corner tr"></div>
-                      <div className="corner bl"></div>
-                      <div className="corner br"></div>
-
-                    </div>
-
-                  </div>
-
-                )}
+                </div>
 
               </div>
 
-              {/* RESULT INFORMATION */}
               <div className="result-information">
 
                 <div className="detected-card">
 
-                  <div className="tower-symbol">
-                    🗼
-                  </div>
+                  <div className="tower-symbol">🗼</div>
 
                   <div>
 
-                    <span>
-                      DETECTED STRUCTURE
-                    </span>
+                    <span>DETECTED STRUCTURES</span>
 
-                    <h2>
-                      {towerType}
-                    </h2>
+                    <h2>{getTowerTypes()}</h2>
 
                     <p>
-                      AI vision system identified
-                      the uploaded tower structure.
+                      Real YOLO model detection result.
                     </p>
 
                   </div>
@@ -705,144 +491,67 @@ function App() {
 
                   <div>
                     <span>Image Quality</span>
+                    <strong>Accepted</strong>
+                  </div>
+
+                  <div>
+                    <span>Detections</span>
+                    <strong>{getDetectionCount()}</strong>
+                  </div>
+
+                  <div>
+                    <span>Supporting Tower</span>
                     <strong>
-                      {quality}%
+                      {getClassConfidence("supporting_tower")}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>Monopole Tower</span>
+                    <strong>
+                      {getClassConfidence("monopole_tower")}
                     </strong>
                   </div>
 
                   <div>
                     <span>Detection Status</span>
-                    <strong className="green">
-                      Verified
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>Object</span>
-                    <strong>
-                      Tower
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>Class</span>
-                    <strong>
-                      {towerType}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>Confidence</span>
-                    <strong>
-                      {confidence}%
-                    </strong>
+                    <strong className="green">Verified</strong>
                   </div>
 
                   <div>
                     <span>Analysis</span>
-                    <strong>
-                      {completed
-                        ? "Completed"
-                        : "Processing"}
-                    </strong>
+                    <strong>Completed</strong>
                   </div>
 
                 </div>
 
-              </div>
+                {getDetectionCount() > 0 && (
+                  <div className="result-details">
 
-            </div>
+                    <div>
+                      <span>Detected Classes</span>
+                      <strong>
+                        {getTowerTypes()}
+                      </strong>
+                    </div>
 
-          </section>
+                    <div>
+                      <span>Bounding Boxes</span>
+                      <strong>
+                        {getDetectionCount()} localized
+                      </strong>
+                    </div>
 
-        )}
-
-        {/* =========================
-            OVERALL SUMMARY
-        ========================= */}
-        {completed && !rejected && (
-
-          <section className="summary-panel">
-
-            <div className="summary-icon">
-              ✓
-            </div>
-
-            <div className="summary-content">
-
-              <p className="panel-label">
-                OVERALL SUMMARY
-              </p>
-
-              <h3>
-                Tower Inspection Completed
-              </h3>
-
-              <p>
-                The uploaded image was successfully processed
-                through the AI inspection pipeline. The image
-                quality was checked, the tower structure was
-                detected, and the final result was generated.
-              </p>
-
-              <div className="summary-tags">
-
-                <span>
-                  ✓ Image Quality: {quality}%
-                </span>
-
-                <span>
-                  ✓ Object: Tower
-                </span>
-
-                <span>
-                  ✓ Type: {towerType}
-                </span>
-
-                <span>
-                  ✓ Confidence: {confidence}%
-                </span>
-
-                <span>
-                  ✓ Status: Completed
-                </span>
+                  </div>
+                )}
 
               </div>
 
             </div>
 
           </section>
-
         )}
 
-        {/* =========================
-            COMPLETION NOTIFICATION
-        ========================= */}
-        {completed && !rejected && (
-
-          <div className="notification show">
-
-            <div className="notification-icon">
-              ✓
-            </div>
-
-            <div>
-
-              <strong>
-                Detection Complete
-              </strong>
-
-              <span>
-                {towerType} successfully identified.
-              </span>
-
-            </div>
-
-          </div>
-
-        )}
-
-        {/* FOOTER */}
         <footer>
 
           <span>
@@ -856,7 +565,6 @@ function App() {
         </footer>
 
       </main>
-
     </div>
   );
 }

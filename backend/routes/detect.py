@@ -10,9 +10,8 @@ from fastapi import (
     HTTPException,
     UploadFile
 )
-
-from services.detector import detect_towers
-from services.image_quality import check_image_quality
+from backend.services.detector import detect_towers
+from backend.services.image_quality import check_image_quality
 
 
 router = APIRouter(

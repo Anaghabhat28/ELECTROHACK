@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from routes.detect import router as detect_router
+#from backend.routes.detect import router as detect_router
 
 
 # =====================================================
@@ -25,7 +25,14 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173"
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:5175",
+        "http://localhost:5176",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+        "http://127.0.0.1:5175",
+        "http://127.0.0.1:5176"
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -64,9 +71,9 @@ app.mount(
 # DETECTION ROUTE
 # =====================================================
 
-app.include_router(
-    detect_router
-)
+# app.include_router(
+#    detect_router
+# )
 
 
 # =====================================================
