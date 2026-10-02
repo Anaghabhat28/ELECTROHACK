@@ -1,8 +1,8 @@
 import { useState } from "react";
 import "./App.css";
 
-const API_URL = "/api/detect";
-const API_BASE = "http://127.0.0.1:8001";
+const API_URL = "https://electrohack-api.onrender.com/detect";
+const API_BASE = "https://electrohack-api.onrender.com";
 
 function App() {
   const [file, setFile] = useState(null);
