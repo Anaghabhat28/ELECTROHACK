@@ -38,10 +38,12 @@ def detect_towers(
     print("Starting YOLO detection...")
 
     results = model.predict(
-        source=image,
-        conf=confidence_threshold,
-        verbose=False
-    )
+    source=image,
+    conf=confidence_threshold,
+    imgsz=416,
+    device="cpu",
+    verbose=False
+)
 
     print("YOLO detection completed.")
 
