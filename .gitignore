@@ -2,6 +2,7 @@
 __pycache__/
 runs/
 *.pt
+!backend/models/best.pt
 *.pyc
 *.jpg
 *.jpeg

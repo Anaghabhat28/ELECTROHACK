@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-#from backend.routes.detect import router as detect_router
+from backend.routes.detect import router as detect_router
 
 
 # =====================================================
@@ -71,9 +71,9 @@ app.mount(
 # DETECTION ROUTE
 # =====================================================
 
-# app.include_router(
-#    detect_router
-# )
+app.include_router(
+    detect_router
+ )
 
 
 # =====================================================
