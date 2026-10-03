@@ -1,4 +1,5 @@
 from pathlib import Path
+import gc
 
 import cv2
 from ultralytics import YOLO
@@ -37,14 +38,49 @@ def detect_towers(
 
     print("Starting YOLO detection...")
 
-    results = model.predict(
-    source=image,
-    conf=confidence_threshold,
-    imgsz=320,
-    device="cpu",
-    verbose=False
-)
+    # -------------------------------------------------
+    # Resize very large images before inference
+    # -------------------------------------------------
 
+    max_dimension = 1280
+
+    height, width = image.shape[:2]
+
+    scale = min(
+        max_dimension / width,
+        max_dimension / height,
+        1.0
+    )
+
+    if scale < 1.0:
+
+        new_width = int(width * scale)
+        new_height = int(height * scale)
+
+        image = cv2.resize(
+            image,
+            (new_width, new_height),
+            interpolation=cv2.INTER_AREA
+        )
+
+        print(
+            f"Image resized to: "
+            f"{new_width}x{new_height}"
+        )
+
+    # -------------------------------------------------
+    # YOLO inference
+    # -------------------------------------------------
+
+    results = model.predict(
+        source=image,
+        conf=confidence_threshold,
+        imgsz=320,
+        device="cpu",
+        batch=1,
+        max_det=10,
+        verbose=False
+    )
 
     print("YOLO detection completed.")
 
@@ -55,6 +91,10 @@ def detect_towers(
     annotated_image = image.copy()
 
     names = model.names
+
+    # -------------------------------------------------
+    # Process detections
+    # -------------------------------------------------
 
     if result.boxes is not None:
 
@@ -91,7 +131,10 @@ def detect_towers(
                 ]
             })
 
+            # -------------------------------------------------
             # Draw bounding box
+            # -------------------------------------------------
+
             cv2.rectangle(
                 annotated_image,
                 (x1, y1),
@@ -108,7 +151,10 @@ def detect_towers(
             cv2.putText(
                 annotated_image,
                 label,
-                (x1, max(y1 - 10, 20)),
+                (
+                    x1,
+                    max(y1 - 10, 20)
+                ),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.6,
                 (0, 255, 0),
@@ -116,6 +162,13 @@ def detect_towers(
             )
 
     print("Detections:", detections)
+
+    # -------------------------------------------------
+    # Release temporary memory
+    # -------------------------------------------------
+
+    del results
+    gc.collect()
 
     return {
         "detections": detections,
