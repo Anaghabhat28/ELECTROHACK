@@ -40,10 +40,11 @@ def detect_towers(
     results = model.predict(
     source=image,
     conf=confidence_threshold,
-    imgsz=416,
+    imgsz=320,
     device="cpu",
     verbose=False
 )
+
 
     print("YOLO detection completed.")
 
